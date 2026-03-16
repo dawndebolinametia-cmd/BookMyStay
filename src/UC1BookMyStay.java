@@ -1,5 +1,5 @@
 
-public class UseCase1HotelBookingApp {
+public class UC1BookMyStay {
 
 
     public static void main(String[] args) {
