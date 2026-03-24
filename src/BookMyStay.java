@@ -1,18 +1,17 @@
 import java.util.*;
 
-// ---------------------- OBSERVER INTERFACE ----------------------
 interface Observer {
     void update(String message);
 }
 
-// ---------------------- SUBJECT INTERFACE ----------------------
+
 interface Subject {
     void registerObserver(Observer o);
     void removeObserver(Observer o);
     void notifyObservers(String message);
 }
 
-// ---------------------- CONCRETE SUBJECT ----------------------
+
 class BookingSystem implements Subject {
     private List<Observer> observers = new ArrayList<>();
 
@@ -33,14 +32,14 @@ class BookingSystem implements Subject {
         }
     }
 
-    // Simulate booking confirmation
+
     public void confirmBooking(String userName, String service) {
         String message = "Booking confirmed for " + userName + " (" + service + ")";
         notifyObservers(message);
     }
 }
 
-// ---------------------- CONCRETE OBSERVERS ----------------------
+
 class EmailService implements Observer {
     @Override
     public void update(String message) {
@@ -55,17 +54,17 @@ class SMSService implements Observer {
     }
 }
 
-// ---------------------- MAIN CLASS ----------------------
+
 public class BookingNotificationSystem {
     public static void main(String[] args) {
 
         BookingSystem bookingSystem = new BookingSystem();
 
-        // Observers
+       
         Observer emailService = new EmailService();
         Observer smsService = new SMSService();
 
-        // Register observers
+      
         bookingSystem.registerObserver(emailService);
         bookingSystem.registerObserver(smsService);
 
@@ -77,7 +76,7 @@ public class BookingNotificationSystem {
         System.out.print("Enter service (Hotel/Flight/Cab): ");
         String service = scanner.nextLine();
 
-        // Confirm booking → triggers notifications
+ 
         bookingSystem.confirmBooking(userName, service);
 
         scanner.close();
