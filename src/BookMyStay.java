@@ -1,84 +1,170 @@
 import java.util.*;
 
-interface Observer {
-    void update(String message);
+// Custom Exception
+class CancellationException extends Exception {
+    public CancellationException(String message) {
+        super(message);
+    }
 }
 
+// Reservation Model
+class Reservation {
+    private String reservationId;
+    private String guestName;
+    private String roomType;
+    private String roomId;
+    private boolean isCancelled;
 
-interface Subject {
-    void registerObserver(Observer o);
-    void removeObserver(Observer o);
-    void notifyObservers(String message);
-}
+    public Reservation(String reservationId, String guestName, String roomType, String roomId) {
+        this.reservationId = reservationId;
+        this.guestName = guestName;
+        this.roomType = roomType;
+        this.roomId = roomId;
+        this.isCancelled = false;
+    }
 
+    public String getReservationId() { return reservationId; }
+    public String getRoomType() { return roomType; }
+    public String getRoomId() { return roomId; }
+    public boolean isCancelled() { return isCancelled; }
 
-class BookingSystem implements Subject {
-    private List<Observer> observers = new ArrayList<>();
-
-    @Override
-    public void registerObserver(Observer o) {
-        observers.add(o);
+    public void cancel() {
+        this.isCancelled = true;
     }
 
     @Override
-    public void removeObserver(Observer o) {
-        observers.remove(o);
+    public String toString() {
+        return reservationId + " | " + guestName + " | " + roomType +
+                " | Room: " + roomId +
+                (isCancelled ? " | CANCELLED" : " | ACTIVE");
+    }
+}
+
+// Manages bookings (acts like history + active store)
+class BookingManager {
+    private Map<String, Reservation> reservations = new HashMap<>();
+
+    public void addReservation(Reservation r) {
+        reservations.put(r.getReservationId(), r);
     }
 
-    @Override
-    public void notifyObservers(String message) {
-        for (Observer o : observers) {
-            o.update(message);
+    public Reservation getReservation(String id) {
+        return reservations.get(id);
+    }
+
+    public void displayAll() {
+        System.out.println("\n=== Booking Records ===");
+        for (Reservation r : reservations.values()) {
+            System.out.println(r);
+        }
+    }
+}
+
+// Handles inventory + rollback stack
+class InventoryManager {
+    private Map<String, Integer> inventory = new HashMap<>();
+    private Stack<String> rollbackStack = new Stack<>();
+
+    public InventoryManager() {
+        inventory.put("Standard", 2);
+        inventory.put("Deluxe", 1);
+        inventory.put("Suite", 1);
+    }
+
+    public void allocate(String roomType, String roomId) {
+        inventory.put(roomType, inventory.get(roomType) - 1);
+        rollbackStack.push(roomId);
+    }
+
+    public void rollback(String roomType) {
+        if (!rollbackStack.isEmpty()) {
+            String releasedRoom = rollbackStack.pop();
+            inventory.put(roomType, inventory.get(roomType) + 1);
+            System.out.println("Rolled back Room ID: " + releasedRoom);
         }
     }
 
-
-    public void confirmBooking(String userName, String service) {
-        String message = "Booking confirmed for " + userName + " (" + service + ")";
-        notifyObservers(message);
+    public void displayInventory() {
+        System.out.println("\n=== Current Inventory ===");
+        for (Map.Entry<String, Integer> e : inventory.entrySet()) {
+            System.out.println(e.getKey() + " -> " + e.getValue());
+        }
     }
 }
 
+// Cancellation Service
+class CancellationService {
 
-class EmailService implements Observer {
-    @Override
-    public void update(String message) {
-        System.out.println("Email sent: " + message);
+    public void cancelBooking(String reservationId,
+                              BookingManager bookingManager,
+                              InventoryManager inventoryManager)
+            throws CancellationException {
+
+        Reservation r = bookingManager.getReservation(reservationId);
+
+        // Validation
+        if (r == null) {
+            throw new CancellationException("Reservation does not exist.");
+        }
+
+        if (r.isCancelled()) {
+            throw new CancellationException("Reservation already cancelled.");
+        }
+
+        // Controlled rollback
+        System.out.println("\nProcessing cancellation for: " + reservationId);
+
+        // Step 1: rollback inventory
+        inventoryManager.rollback(r.getRoomType());
+
+        // Step 2: mark booking cancelled
+        r.cancel();
+
+        System.out.println("Cancellation successful for " + reservationId);
     }
 }
 
-class SMSService implements Observer {
-    @Override
-    public void update(String message) {
-        System.out.println("SMS sent: " + message);
-    }
-}
+// Main Class
+public class Bookmystay {
 
-
-public class BookingNotificationSystem {
     public static void main(String[] args) {
 
-        BookingSystem bookingSystem = new BookingSystem();
+        BookingManager bookingManager = new BookingManager();
+        InventoryManager inventoryManager = new InventoryManager();
+        CancellationService cancellationService = new CancellationService();
 
-       
-        Observer emailService = new EmailService();
-        Observer smsService = new SMSService();
+        // Simulate confirmed bookings
+        Reservation r1 = new Reservation("RES201", "Alice", "Deluxe", "D1");
+        Reservation r2 = new Reservation("RES202", "Bob", "Suite", "S1");
 
-      
-        bookingSystem.registerObserver(emailService);
-        bookingSystem.registerObserver(smsService);
+        bookingManager.addReservation(r1);
+        bookingManager.addReservation(r2);
 
-        Scanner scanner = new Scanner(System.in);
+        // Simulate allocation (affects inventory + stack)
+        inventoryManager.allocate("Deluxe", "D1");
+        inventoryManager.allocate("Suite", "S1");
 
-        System.out.print("Enter your name: ");
-        String userName = scanner.nextLine();
+        bookingManager.displayAll();
+        inventoryManager.displayInventory();
 
-        System.out.print("Enter service (Hotel/Flight/Cab): ");
-        String service = scanner.nextLine();
+        // Cancellation scenarios
+        String[] cancelRequests = {
+                "RES201",  // valid
+                "RES999",  // non-existent
+                "RES201"   // already cancelled
+        };
 
- 
-        bookingSystem.confirmBooking(userName, service);
+        for (String id : cancelRequests) {
+            try {
+                cancellationService.cancelBooking(id, bookingManager, inventoryManager);
+            } catch (CancellationException e) {
+                System.out.println("Cancellation Failed: " + e.getMessage());
+            }
+        }
 
-        scanner.close();
+        bookingManager.displayAll();
+        inventoryManager.displayInventory();
+
+        System.out.println("\nSystem state remains consistent after rollback.");
     }
 }
