@@ -1,99 +1,85 @@
-
 import java.util.*;
 
-// ---------------------- MODEL ----------------------
-class BookingEntry {
-    private int id;
-    private String userName;
-    private String service;
-    private Date bookingDate;
+// ---------------------- OBSERVER INTERFACE ----------------------
+interface Observer {
+    void update(String message);
+}
 
-    public BookingEntry(int id, String userName, String service, Date bookingDate) {
-        this.id = id;
-        this.userName = userName;
-        this.service = service;
-        this.bookingDate = bookingDate;
-    }
+// ---------------------- SUBJECT INTERFACE ----------------------
+interface Subject {
+    void registerObserver(Observer o);
+    void removeObserver(Observer o);
+    void notifyObservers(String message);
+}
 
-    public int getId() { return id; }
-    public String getUserName() { return userName; }
-    public String getService() { return service; }
-    public Date getBookingDate() { return bookingDate; }
+// ---------------------- CONCRETE SUBJECT ----------------------
+class BookingSystem implements Subject {
+    private List<Observer> observers = new ArrayList<>();
 
     @Override
-    public String toString() {
-        return "Booking ID: " + id +
-               ", User: " + userName +
-               ", Service: " + service +
-               ", Date: " + bookingDate;
-    }
-}
-
-// ---------------------- REPOSITORY ----------------------
-class BookingRepository {
-    private List<BookingEntry> bookings = new ArrayList<>();
-
-    public void addBooking(BookingEntry booking) {
-        bookings.add(booking);
+    public void registerObserver(Observer o) {
+        observers.add(o);
     }
 
-    public List<BookingEntry> getAllBookings() {
-        return bookings;
+    @Override
+    public void removeObserver(Observer o) {
+        observers.remove(o);
     }
 
-    public List<BookingEntry> getBookingsByUser(String userName) {
-        List<BookingEntry> result = new ArrayList<>();
-        for (BookingEntry b : bookings) {
-            if (b.getUserName().equalsIgnoreCase(userName)) {
-                result.add(b);
-            }
-        }
-        return result;
-    }
-}
-
-// ---------------------- SERVICE ----------------------
-class BookingReportService {
-    private BookingRepository repository;
-
-    public BookingReportService(BookingRepository repository) {
-        this.repository = repository;
-    }
-
-    // Display all bookings
-    public void displayAllBookings() {
-        List<BookingEntry> bookings = repository.getAllBookings();
-        System.out.println("\n--- All Bookings ---");
-        for (BookingEntry b : bookings) {
-            System.out.println(b);
+    @Override
+    public void notifyObservers(String message) {
+        for (Observer o : observers) {
+            o.update(message);
         }
     }
 
-    // Display bookings for a specific user
-    public void displayBookingsByUser(String userName) {
-        List<BookingEntry> bookings = repository.getBookingsByUser(userName);
-        System.out.println("\n--- Bookings for " + userName + " ---");
-        for (BookingEntry b : bookings) {
-            System.out.println(b);
-        }
+    // Simulate booking confirmation
+    public void confirmBooking(String userName, String service) {
+        String message = "Booking confirmed for " + userName + " (" + service + ")";
+        notifyObservers(message);
     }
 }
 
-// ---------------------- MAIN ----------------------
-public class BookingHistoryReport {
+// ---------------------- CONCRETE OBSERVERS ----------------------
+class EmailService implements Observer {
+    @Override
+    public void update(String message) {
+        System.out.println("Email sent: " + message);
+    }
+}
+
+class SMSService implements Observer {
+    @Override
+    public void update(String message) {
+        System.out.println("SMS sent: " + message);
+    }
+}
+
+// ---------------------- MAIN CLASS ----------------------
+public class BookingNotificationSystem {
     public static void main(String[] args) {
 
-        BookingRepository repo = new BookingRepository();
+        BookingSystem bookingSystem = new BookingSystem();
 
-        // Adding sample data
-        repo.addBooking(new BookingEntry(1, "Debbie", "Hotel Booking", new Date()));
-        repo.addBooking(new BookingEntry(2, "Debbie", "Flight Booking", new Date()));
-        repo.addBooking(new BookingEntry(3, "Avani", "Cab Booking", new Date()));
+        // Observers
+        Observer emailService = new EmailService();
+        Observer smsService = new SMSService();
 
-        BookingReportService service = new BookingReportService(repo);
+        // Register observers
+        bookingSystem.registerObserver(emailService);
+        bookingSystem.registerObserver(smsService);
 
-        // Display reports
-        service.displayAllBookings();
-        service.displayBookingsByUser("Debbie");
+        Scanner scanner = new Scanner(System.in);
+
+        System.out.print("Enter your name: ");
+        String userName = scanner.nextLine();
+
+        System.out.print("Enter service (Hotel/Flight/Cab): ");
+        String service = scanner.nextLine();
+
+        // Confirm booking → triggers notifications
+        bookingSystem.confirmBooking(userName, service);
+
+        scanner.close();
     }
 }
