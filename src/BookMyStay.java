@@ -1,99 +1,126 @@
 
+
+ import java.io.*;
 import java.util.*;
 
-// ---------------------- MODEL ----------------------
-class BookingEntry {
-    private int id;
-    private String userName;
-    private String service;
-    private Date bookingDate;
+// Reservation (Serializable)
+class Reservation implements Serializable {
+    private static final long serialVersionUID = 1L;
 
-    public BookingEntry(int id, String userName, String service, Date bookingDate) {
-        this.id = id;
-        this.userName = userName;
-        this.service = service;
-        this.bookingDate = bookingDate;
+    private String reservationId;
+    private String guestName;
+    private String roomType;
+
+    public Reservation(String reservationId, String guestName, String roomType) {
+        this.reservationId = reservationId;
+        this.guestName = guestName;
+        this.roomType = roomType;
     }
-
-    public int getId() { return id; }
-    public String getUserName() { return userName; }
-    public String getService() { return service; }
-    public Date getBookingDate() { return bookingDate; }
 
     @Override
     public String toString() {
-        return "Booking ID: " + id +
-               ", User: " + userName +
-               ", Service: " + service +
-               ", Date: " + bookingDate;
+        return reservationId + " | " + guestName + " | " + roomType;
     }
 }
 
-// ---------------------- REPOSITORY ----------------------
-class BookingRepository {
-    private List<BookingEntry> bookings = new ArrayList<>();
+// Wrapper class for full system state
+class SystemState implements Serializable {
+    private static final long serialVersionUID = 1L;
 
-    public void addBooking(BookingEntry booking) {
-        bookings.add(booking);
-    }
+    List<Reservation> bookingHistory;
+    Map<String, Integer> inventory;
 
-    public List<BookingEntry> getAllBookings() {
-        return bookings;
-    }
-
-    public List<BookingEntry> getBookingsByUser(String userName) {
-        List<BookingEntry> result = new ArrayList<>();
-        for (BookingEntry b : bookings) {
-            if (b.getUserName().equalsIgnoreCase(userName)) {
-                result.add(b);
-            }
-        }
-        return result;
+    public SystemState(List<Reservation> bookingHistory, Map<String, Integer> inventory) {
+        this.bookingHistory = bookingHistory;
+        this.inventory = inventory;
     }
 }
 
-// ---------------------- SERVICE ----------------------
-class BookingReportService {
-    private BookingRepository repository;
+// Persistence Service
+class PersistenceService {
 
-    public BookingReportService(BookingRepository repository) {
-        this.repository = repository;
-    }
+    private static final String FILE_NAME = "system_state.dat";
 
-    // Display all bookings
-    public void displayAllBookings() {
-        List<BookingEntry> bookings = repository.getAllBookings();
-        System.out.println("\n--- All Bookings ---");
-        for (BookingEntry b : bookings) {
-            System.out.println(b);
+    // Save state to file
+    public void save(SystemState state) {
+        try (ObjectOutputStream oos =
+                     new ObjectOutputStream(new FileOutputStream(FILE_NAME))) {
+
+            oos.writeObject(state);
+            System.out.println("System state saved successfully.");
+
+        } catch (IOException e) {
+            System.out.println("Error saving system state: " + e.getMessage());
         }
     }
 
-    // Display bookings for a specific user
-    public void displayBookingsByUser(String userName) {
-        List<BookingEntry> bookings = repository.getBookingsByUser(userName);
-        System.out.println("\n--- Bookings for " + userName + " ---");
-        for (BookingEntry b : bookings) {
-            System.out.println(b);
+    // Load state from file
+    public SystemState load() {
+        try (ObjectInputStream ois =
+                     new ObjectInputStream(new FileInputStream(FILE_NAME))) {
+
+            SystemState state = (SystemState) ois.readObject();
+            System.out.println("System state restored successfully.");
+            return state;
+
+        } catch (FileNotFoundException e) {
+            System.out.println("No previous state found. Starting fresh.");
+        } catch (IOException | ClassNotFoundException e) {
+            System.out.println("Corrupted state. Starting with clean data.");
         }
+        return null;
     }
 }
 
-// ---------------------- MAIN ----------------------
-public class BookingHistoryReport {
+// Main Class
+public class Bookmystay {
+
     public static void main(String[] args) {
 
-        BookingRepository repo = new BookingRepository();
+        PersistenceService persistenceService = new PersistenceService();
 
-        // Adding sample data
-        repo.addBooking(new BookingEntry(1, "Debbie", "Hotel Booking", new Date()));
-        repo.addBooking(new BookingEntry(2, "Debbie", "Flight Booking", new Date()));
-        repo.addBooking(new BookingEntry(3, "Avani", "Cab Booking", new Date()));
+        // Attempt to restore previous state
+        SystemState restoredState = persistenceService.load();
 
-        BookingReportService service = new BookingReportService(repo);
+        List<Reservation> bookingHistory;
+        Map<String, Integer> inventory;
 
-        // Display reports
-        service.displayAllBookings();
-        service.displayBookingsByUser("Debbie");
+        if (restoredState != null) {
+            bookingHistory = restoredState.bookingHistory;
+            inventory = restoredState.inventory;
+        } else {
+            // Initialize fresh state
+            bookingHistory = new ArrayList<>();
+            inventory = new HashMap<>();
+            inventory.put("Standard", 2);
+            inventory.put("Deluxe", 1);
+            inventory.put("Suite", 1);
+        }
+
+        // Simulate system usage
+        System.out.println("\n--- Current System State ---");
+
+        bookingHistory.add(new Reservation("RES301", "Alice", "Deluxe"));
+        bookingHistory.add(new Reservation("RES302", "Bob", "Suite"));
+
+        inventory.put("Deluxe", inventory.get("Deluxe") - 1);
+        inventory.put("Suite", inventory.get("Suite") - 1);
+
+        // Display state
+        System.out.println("\nBookings:");
+        for (Reservation r : bookingHistory) {
+            System.out.println(r);
+        }
+
+        System.out.println("\nInventory:");
+        for (Map.Entry<String, Integer> e : inventory.entrySet()) {
+            System.out.println(e.getKey() + " -> " + e.getValue());
+        }
+
+        // Save state before shutdown
+        SystemState currentState = new SystemState(bookingHistory, inventory);
+        persistenceService.save(currentState);
+
+        System.out.println("\nSystem ready for shutdown and recovery.");
     }
 }
